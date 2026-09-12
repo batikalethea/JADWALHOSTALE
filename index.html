@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Stream Scheduler - ALETHEA BATIK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-enter { animation: modalEnter 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes modalEnter {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .loader {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #6366f1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 h-screen w-full flex justify-center overflow-hidden">
+
+    <div class="w-full max-w-md bg-slate-900 h-full flex flex-col relative shadow-2xl overflow-hidden border-x border-slate-800">
+        
+        <!-- Header Utama -->
+        <header class="p-4 bg-slate-800/90 backdrop-blur-md border-b border-slate-700/60 flex justify-between items-center z-20 sticky top-0 shadow-md">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-video text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">ALETHEA BATIK</h1>
+                    <p class="text-[10px] text-indigo-400 font-semibold uppercase tracking-widest">Penjadwalan Host Live</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openAdminLogin()" title="Login / Mode Admin" class="w-10 h-10 rounded-xl bg-slate-700/60 text-slate-300 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center border border-slate-600/50 shadow-sm">
+                    <i class="fa-solid fa-user-shield text-sm"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- VIEW: USER (JADWAL HARIAN) -->
+        <main id="view-user" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-8 relative fade-in">
+            <!-- Filter Tanggal Harian -->
+            <div class="bg-slate-800/90 p-1.5 rounded-2xl flex items-center mb-3 border border-slate-700/60 shadow-lg">
+                <button onclick="changeDate(-1)" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-700 hover:text-white transition-colors">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <input type="date" id="filter-date" onchange="renderSchedules()" class="flex-1 bg-transparent text-center text-white font-bold outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:invert cursor-pointer text-sm">
+                <button onclick="changeDate(1)" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-700 hover:text-white transition-colors">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Tab Dashboard Platform (Shopee vs TikTok) -->
+            <div class="grid grid-cols-3 gap-1.5 p-1 bg-slate-900/90 rounded-xl mb-4 border border-slate-800/80 shadow-inner">
+                <button onclick="setUserPlatformFilter('all')" id="user-tab-all" class="py-2 text-xs font-bold rounded-lg transition-all text-white bg-indigo-600 shadow-sm flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-layer-group text-[10px]"></i> Semua <span id="count-user-all" class="bg-indigo-900/80 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                </button>
+                <button onclick="setUserPlatformFilter('shopee')" id="user-tab-shopee" class="py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-orange-400 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-bag-shopping text-orange-500"></i> Shopee <span id="count-user-shopee" class="bg-slate-800 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                </button>
+                <button onclick="setUserPlatformFilter('tiktok')" id="user-tab-tiktok" class="py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-cyan-400 flex items-center justify-center gap-1.5">
+                    <i class="fa-brands fa-tiktok text-cyan-400"></i> TikTok <span id="count-user-tiktok" class="bg-slate-800 px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                </button>
+            </div>
+
+            <!-- Area Status Loading Overlay -->
+            <div id="loading-overlay" class="hidden absolute inset-0 z-10 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                <div class="loader mb-3"></div>
+                <p class="text-sm text-indigo-300 font-semibold animate-pulse">Menyinkronkan data...</p>
+            </div>
+
+            <!-- List Jadwal -->
+            <div id="schedule-list" class="space-y-4 pb-12">
+                <!-- Data dimuat dinamis via JS -->
+            </div>
+        </main>
+
+        <!-- VIEW: ADMIN DASHBOARD -->
+        <main id="view-admin" class="hidden flex-1 overflow-y-auto no-scrollbar flex flex-col relative fade-in bg-slate-900">
+            <!-- Navigasi Tab Admin -->
+            <div class="flex p-2 bg-slate-800 border-b border-slate-700/60 z-10 sticky top-0 shadow-sm gap-1">
+                <button onclick="switchAdminTab('schedules')" id="tab-schedules" class="flex-1 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white transition-all">Jadwal</button>
+                <button onclick="switchAdminTab('hosts')" id="tab-hosts" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-slate-200 transition-all">Host</button>
+                <button onclick="switchAdminTab('platforms')" id="tab-platforms" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-slate-200 transition-all">Akun</button>
+                <button onclick="switchAdminTab('history')" id="tab-history" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-slate-200 transition-all">Riwayat Tukar</button>
+            </div>
+
+            <div class="p-4 flex-1 flex flex-col relative">
+                <!-- Toolbar Khusus Tab Jadwal -->
+                <div id="admin-schedule-tools" class="space-y-3 mb-4">
+                    <div class="flex gap-2">
+                        <input type="date" id="admin-filter-date" onchange="renderAdminList()" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 [&::-webkit-calendar-picker-indicator]:invert">
+                        
+                        <button onclick="openCopyScheduleModal()" class="px-4 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap shadow-sm">
+                            <i class="fa-solid fa-copy"></i> Salin Jadwal
+                        </button>
+                    </div>
+
+                    <!-- Filter Dashboard Platform Admin -->
+                    <div class="flex bg-slate-900 p-1 rounded-xl border border-slate-800 gap-1 text-xs">
+                        <button onclick="setAdminPlatformFilter('all')" id="admin-filter-all" class="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition-all text-center">Semua</button>
+                        <button onclick="setAdminPlatformFilter('shopee')" id="admin-filter-shopee" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-orange-400 font-semibold transition-all text-center flex items-center justify-center gap-1"><i class="fa-solid fa-bag-shopping text-orange-500"></i> Shopee</button>
+                        <button onclick="setAdminPlatformFilter('tiktok')" id="admin-filter-tiktok" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-cyan-400 font-semibold transition-all text-center flex items-center justify-center gap-1"><i class="fa-brands fa-tiktok text-cyan-400"></i> TikTok</button>
+                    </div>
+                </div>
+
+                <!-- Container List Data Admin -->
+                <div id="admin-list-container" class="space-y-3 pb-28">
+                    <!-- Dimuat via JS -->
+                </div>
+            </div>
+
+            <!-- Floating Buttons Admin -->
+            <div id="admin-floating-actions" class="fixed bottom-6 w-full max-w-md px-6 flex justify-between pointer-events-none z-20">
+                <button onclick="exitAdmin()" class="pointer-events-auto w-12 h-12 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full flex items-center justify-center text-slate-300 shadow-xl transition-transform hover:scale-105">
+                    <i class="fa-solid fa-arrow-left text-lg"></i>
+                </button>
+                
+                <button id="btn-admin-add" onclick="openFormModal()" class="pointer-events-auto w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-full flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.5)] transition-transform hover:scale-105">
+                    <i class="fa-solid fa-plus text-xl"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="absolute top-16 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none"></div>
+
+        <!-- Modal Konfirmasi Umum -->
+        <div id="confirm-modal" class="hidden absolute inset-0 z-[60] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-700 modal-enter">
+                <div class="w-12 h-12 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-xl mb-4">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2" id="confirm-title">Konfirmasi</h3>
+                <p class="text-slate-300 text-sm mb-6 leading-relaxed" id="confirm-message">Apakah anda yakin?</p>
+                <div class="flex gap-3 justify-end">
+                    <button id="confirm-cancel" class="flex-1 py-3 rounded-xl bg-slate-700 text-slate-200 font-semibold hover:bg-slate-600 text-sm">Batal</button>
+                    <button id="confirm-ok" class="flex-1 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-500 text-sm">Ya, Lanjutkan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Login Admin -->
+        <div id="login-modal" class="hidden absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-[320px] shadow-2xl border border-slate-700 modal-enter">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner border border-indigo-500/30">
+                        <i class="fa-solid fa-user-shield text-2xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white">Login Admin</h3>
+                    <p class="text-xs text-slate-400 mt-1">Masukkan PIN Otentikasi (138080)</p>
+                </div>
+                <input type="password" id="admin-pin-input" placeholder="••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3.5 text-center text-2xl tracking-[0.4em] text-white focus:outline-none focus:border-indigo-500 mb-5 font-mono" inputmode="numeric">
+                <div class="flex gap-3">
+                    <button onclick="closeModal('login-modal')" class="flex-1 py-3 rounded-xl bg-slate-700 text-slate-300 font-semibold hover:bg-slate-600 text-sm">Batal</button>
+                    <button onclick="verifyAdminLogin()" class="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 text-sm">Login</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Form CRUD Dinamis -->
+        <div id="form-modal" class="hidden absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl p-6 border-t border-slate-700 sm:border modal-enter max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="form-modal-title" class="text-xl font-bold text-white">Tambah Data</h3>
+                    <button onclick="closeModal('form-modal')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-600 transition-colors">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Formulir: Jadwal -->
+                <div id="form-schedules" class="hidden space-y-4">
+                    <input type="hidden" id="sched-id">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Tanggal</label>
+                        <input type="date" id="sched-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 [&::-webkit-calendar-picker-indicator]:invert text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Waktu Shift</label>
+                        <input type="text" id="sched-time" placeholder="Misal: 08:00 - 10:00 WIB" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Akun Platform (Shopee / TikTok)</label>
+                        <select id="sched-platform" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 appearance-none text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Host Bertugas</label>
+                        <select id="sched-host" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 appearance-none text-sm"></select>
+                    </div>
+                </div>
+
+                <!-- Formulir: Host -->
+                <div id="form-hosts" class="hidden space-y-4">
+                    <input type="hidden" id="host-id">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Nama Host</label>
+                        <input type="text" id="host-name" placeholder="Nama Lengkap / Panggilan" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Nomor WhatsApp</label>
+                        <input type="tel" id="host-wa" placeholder="081234567890" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm">
+                        <p class="text-[10px] text-slate-500 mt-1">Otomatis diubah ke format internasional (628...)</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">PIN Host (Untuk Konfirmasi Tukar Shift)</label>
+                        <input type="password" id="host-pin" placeholder="Buat 4 Digit PIN Rahasia" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-mono tracking-widest" inputmode="numeric">
+                    </div>
+                </div>
+
+                <!-- Formulir: Platform -->
+                <div id="form-platforms" class="hidden space-y-4">
+                    <input type="hidden" id="plat-id">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 font-semibold">Nama Akun (Contoh: Shopee ALETHEA, TikTok ALETHEA)</label>
+                        <input type="text" id="plat-name" placeholder="Nama Akun Platform" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2 font-semibold">Jenis Platform</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center gap-2 p-3 border border-slate-700 rounded-xl bg-slate-900 cursor-pointer">
+                                <input type="radio" name="plat-type" value="shopee" class="text-orange-500 focus:ring-orange-500 bg-slate-800 border-slate-600">
+                                <span class="text-slate-200 font-medium text-sm flex items-center gap-2"><i class="fa-solid fa-bag-shopping text-orange-500"></i> Shopee</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 border border-slate-700 rounded-xl bg-slate-900 cursor-pointer">
+                                <input type="radio" name="plat-type" value="tiktok" class="text-cyan-400 focus:ring-cyan-400 bg-slate-800 border-slate-600">
+                                <span class="text-slate-200 font-medium text-sm flex items-center gap-2"><i class="fa-brands fa-tiktok text-cyan-400"></i> TikTok</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button onclick="saveFormData()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-600/30 text-sm flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Salin Jadwal 7 Hari Ke Depan -->
+        <div id="copy-schedule-modal" class="hidden absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl p-6 border-t border-slate-700 sm:border modal-enter max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-copy text-indigo-400 mr-2"></i>Salin Jadwal</h3>
+                        <p class="text-xs text-slate-400 mt-0.5" id="copy-source-info">Salin jadwal tanggal ini ke hari lain</p>
+                    </div>
+                    <button onclick="closeModal('copy-schedule-modal')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-600 transition-colors">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-4 my-4">
+                    <p class="text-xs text-slate-300">Pilih tanggal tujuan untuk menyalin seluruh sesi jadwal hari ini (bisa memilih lebih dari 1 hari hingga 7 hari kedepan):</p>
+                    
+                    <div id="copy-target-days-container" class="space-y-2 max-h-60 overflow-y-auto p-1 no-scrollbar">
+                        <!-- List opsi 7 hari kedepan dimuat via JS -->
+                    </div>
+
+                    <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/60 text-xs text-slate-400">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="copy-overwrite" class="rounded bg-slate-800 border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                            <span>Hapus/Timpa jadwal yang sudah ada di tanggal tujuan</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-3">
+                    <button onclick="closeModal('copy-schedule-modal')" class="flex-1 py-3 rounded-xl bg-slate-700 text-slate-300 font-semibold hover:bg-slate-600 text-sm">Batal</button>
+                    <button onclick="executeCopySchedule()" class="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 text-sm">Proses Salin</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Tukar Shift antar Host -->
+        <div id="swap-modal" class="hidden absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-slate-800 rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl p-6 border-t border-slate-700 sm:border modal-enter max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-right-left text-blue-400"></i> Tukar Shift Live</h3>
+                        <p class="text-xs text-slate-400 mt-1" id="swap-source-info">Memuat data...</p>
+                    </div>
+                    <button onclick="closeModal('swap-modal')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-600 transition-colors">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Jadwal Pengganti (Tujuan Pertukaran)</label>
+                        <select id="swap-target" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500 text-sm appearance-none">
+                            <!-- Dimuat via JS -->
+                        </select>
+                    </div>
+
+                    <div class="p-4 bg-slate-900/60 rounded-xl border border-slate-700/60 space-y-3">
+                        <p class="text-[11px] text-center text-slate-400 font-semibold uppercase tracking-wider">VERIFIKASI PIN KEDUA HOST</p>
+                        <div>
+                            <label id="lbl-pin-1" class="block text-xs text-slate-300 mb-1">PIN Host Pengaju</label>
+                            <input type="password" id="swap-pin-1" placeholder="••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-center tracking-[0.5em] text-white focus:outline-none focus:border-indigo-500 font-mono text-base" inputmode="numeric">
+                        </div>
+                        <div>
+                            <label id="lbl-pin-2" class="block text-xs text-slate-300 mb-1">PIN Host Pengganti</label>
+                            <input type="password" id="swap-pin-2" placeholder="••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-center tracking-[0.5em] text-white focus:outline-none focus:border-indigo-500 font-mono text-base" inputmode="numeric">
+                        </div>
+                    </div>
+
+                    <button onclick="executeSwap()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-check-double"></i> Konfirmasi Tukar Shift
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT UTAMA -->
+    <script>
+        const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/16cYB_Vz3ReJnhMj0VOq1U9hnTa4xaX9qgzQga7ci67c/edit?usp=sharing";
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby83kvTRuZmOiHwBK2eCCRhM-XLmNOO0W453EvIC2y-3RJbsdg1AB_l9SpG3YDDbBqv/exec";
+
+        const getToday = () => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        let state = {
+            hosts: [],
+            platforms: [],
+            schedules: [],
+            swapHistory: []
+        };
+
+        const DEFAULT_STATE = {
+            hosts: [
+                { id: 'h1', name: 'Siti', wa: '081234567890', pin: '1234' },
+                { id: 'h2', name: 'Budi', wa: '081298765432', pin: '5678' }
+            ],
+            platforms: [
+                { id: 'p1', name: 'Shopee ALETHEA Official', type: 'shopee' },
+                { id: 'p2', name: 'TikTok ALETHEA Official', type: 'tiktok' }
+            ],
+            schedules: [
+                { id: 's1', date: getToday(), time: '08:00 - 10:00 WIB', platformId: 'p1', hostId: 'h1' },
+                { id: 's2', date: getToday(), time: '13:00 - 15:00 WIB', platformId: 'p2', hostId: 'h2' }
+            ],
+            swapHistory: []
+        };
+
+        let currentAdminTab = 'schedules';
+        let currentSwapScheduleId = null;
+        let isAdmin = false;
+        let userPlatformFilter = 'all';
+        let adminPlatformFilter = 'all';
+
+        const generateId = () => 'id_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        
+        const formatWaNumber = (number) => {
+            let cleaned = (number || '').replace(/\D/g, '');
+            if (cleaned.startsWith('0')) cleaned = '62' + cleaned.substring(1);
+            return cleaned;
+        };
+
+        const showToast = (message, type = 'info') => {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            
+            let colorClass = 'bg-slate-800 text-slate-200 border-slate-700';
+            let icon = 'fa-circle-info text-blue-400';
+            
+            if (type === 'success') { colorClass = 'bg-emerald-950/95 text-emerald-100 border-emerald-800'; icon = 'fa-circle-check text-emerald-400'; }
+            if (type === 'error') { colorClass = 'bg-red-950/95 text-red-100 border-red-800'; icon = 'fa-circle-xmark text-red-400'; }
+
+            toast.className = `${colorClass} border px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 fade-in pointer-events-auto backdrop-blur-md w-full`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-lg"></i><span class="text-xs font-semibold leading-tight">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        };
+
+        const getPlatformUI = (type) => {
+            if (type === 'shopee') return { color: 'text-orange-500', bg: 'bg-orange-500/15 border-orange-500/30', icon: 'fa-bag-shopping', name: 'Shopee' };
+            if (type === 'tiktok') return { color: 'text-cyan-400', bg: 'bg-cyan-400/15 border-cyan-400/30', icon: 'fa-tiktok', name: 'TikTok' };
+            return { color: 'text-slate-400', bg: 'bg-slate-800 border-slate-700', icon: 'fa-cube', name: 'Platform' };
+        };
+
+        const openModal = (id) => document.getElementById(id)?.classList.remove('hidden');
+        
+        const closeModal = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.querySelectorAll('input').forEach(i => {
+                if(i.type !== 'date' && i.type !== 'radio' && i.type !== 'checkbox') i.value = '';
+            });
+            el.classList.add('hidden');
+        };
+
+        let confirmCallback = null;
+        const showConfirm = (title, message, callback) => {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            confirmCallback = callback;
+            openModal('confirm-modal');
+        };
+        
+        document.getElementById('confirm-cancel').onclick = () => closeModal('confirm-modal');
+        document.getElementById('confirm-ok').onclick = () => {
+            closeModal('confirm-modal');
+            if (confirmCallback) confirmCallback();
+        };
+
+        function toggleLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            if (!overlay) return;
+            if(show) {
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function saveToLocalStorage(data) {
+            try {
+                localStorage.setItem('alethea_live_state', JSON.stringify(data));
+            } catch(e) {}
+        }
+
+        function loadLocalFallback(msg) {
+            try {
+                const saved = localStorage.getItem('alethea_live_state');
+                if (saved) {
+                    state = JSON.parse(saved);
+                } else if (!state.hosts || state.hosts.length === 0) {
+                    state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                }
+            } catch(e) {
+                if (!state.hosts || state.hosts.length === 0) state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+            }
+            renderSchedules();
+            if(isAdmin) renderAdminList();
+            if (msg) showToast(msg, "info");
+            toggleLoading(false);
+        }
+
+        function fetchWithJsonp(url, timeoutMs = 4000) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+                const script = document.createElement('script');
+                
+                const timer = setTimeout(() => {
+                    cleanup();
+                    reject(new Error("JSONP Request Timeout"));
+                }, timeoutMs);
+
+                function cleanup() {
+                    if (script && script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
+                    clearTimeout(timer);
+                }
+
+                window[callbackName] = function(data) {
+                    cleanup();
+                    resolve(data);
+                };
+
+                const delimiter = url.includes('?') ? '&' : '?';
+                script.src = url + delimiter + 'callback=' + callbackName;
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error("JSONP Script load error"));
+                };
+
+                document.head.appendChild(script);
+            });
+        }
+
+        async function fetchCloudData() {
+            if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("TARUH_URL")) {
+                loadLocalFallback("Menggunakan data penyimpanan lokal.");
+                return;
+            }
+            
+            toggleLoading(true);
+
+            try {
+                const jsonpRes = await fetchWithJsonp(GAS_WEB_APP_URL + "?action=getData");
+                if (jsonpRes && jsonpRes.success && jsonpRes.data) {
+                    state = {
+                        hosts: jsonpRes.data.hosts || [],
+                        platforms: jsonpRes.data.platforms || [],
+                        schedules: jsonpRes.data.schedules || [],
+                        swapHistory: jsonpRes.data.swapHistory || []
+                    };
+                    saveToLocalStorage(state);
+                    renderSchedules();
+                    if(isAdmin) renderAdminList();
+                    showToast("Data tersinkronisasi dari Cloud", "success");
+                    toggleLoading(false);
+                    return;
+                }
+            } catch(e) {
+                console.warn("JSONP Fetch tidak berhasil, menguji Fetch standar...", e);
+            }
+
+            try {
+                const res = await fetch(GAS_WEB_APP_URL + "?action=getData", { redirect: 'follow' });
+                const json = await res.json();
+                
+                if (json.success && json.data) {
+                    state = {
+                        hosts: json.data.hosts || [],
+                        platforms: json.data.platforms || [],
+                        schedules: json.data.schedules || [],
+                        swapHistory: json.data.swapHistory || []
+                    };
+                    saveToLocalStorage(state);
+                    renderSchedules();
+                    if(isAdmin) renderAdminList();
+                    showToast("Data tersinkronisasi", "success");
+                    toggleLoading(false);
+                    return;
+                }
+            } catch(e) {
+                console.warn("Direct fetch error:", e);
+                loadLocalFallback("Akses Cloud terhalang CORS. Menampilkan data lokal.");
+            }
+        }
+
+        function syncDataToCloud() {
+            saveToLocalStorage(state);
+            if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("TARUH_URL")) return;
+            
+            showToast("Menyimpan ke Spreadsheet...", "info");
+            
+            try {
+                fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'SYNC_ALL', data: state })
+                });
+            } catch (e) {
+                console.error("Sync error:", e);
+                showToast("Tersimpan secara lokal", "info");
+            }
+        }
+
+        function changeDate(delta) {
+            const dateInput = document.getElementById('filter-date');
+            if(!dateInput.value) dateInput.value = getToday();
+            
+            const curr = new Date(dateInput.value);
+            curr.setDate(curr.getDate() + delta);
+            
+            const yyyy = curr.getFullYear();
+            const mm = String(curr.getMonth() + 1).padStart(2, '0');
+            const dd = String(curr.getDate()).padStart(2, '0');
+            
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+            renderSchedules();
+        }
+
+        function setUserPlatformFilter(filter) {
+            userPlatformFilter = filter;
+            ['all', 'shopee', 'tiktok'].forEach(f => {
+                const btn = document.getElementById(`user-tab-${f}`);
+                if (btn) {
+                    if (f === filter) {
+                        btn.className = "py-2 text-xs font-bold rounded-lg transition-all text-white bg-indigo-600 shadow-sm flex items-center justify-center gap-1.5";
+                    } else {
+                        btn.className = "py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-white flex items-center justify-center gap-1.5";
+                    }
+                }
+            });
+            renderSchedules();
+        }
+
+        function setAdminPlatformFilter(filter) {
+            adminPlatformFilter = filter;
+            ['all', 'shopee', 'tiktok'].forEach(f => {
+                const btn = document.getElementById(`admin-filter-${f}`);
+                if (btn) {
+                    if (f === filter) {
+                        btn.className = "flex-1 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition-all text-center";
+                    } else {
+                        btn.className = "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 font-semibold transition-all text-center";
+                    }
+                }
+            });
+            renderAdminList();
+        }
+
+        function renderSchedules() {
+            const container = document.getElementById('schedule-list');
+            const targetDate = document.getElementById('filter-date').value || getToday();
+            
+            let filtered = (state.schedules || []).filter(s => s.date === targetDate);
+
+            // Platform counts
+            const countAll = filtered.length;
+            const countShopee = filtered.filter(s => {
+                const p = state.platforms.find(plat => plat.id === s.platformId);
+                return p && p.type === 'shopee';
+            }).length;
+            const countTiktok = filtered.filter(s => {
+                const p = state.platforms.find(plat => plat.id === s.platformId);
+                return p && p.type === 'tiktok';
+            }).length;
+
+            document.getElementById('count-user-all').innerText = countAll;
+            document.getElementById('count-user-shopee').innerText = countShopee;
+            document.getElementById('count-user-tiktok').innerText = countTiktok;
+
+            if (userPlatformFilter !== 'all') {
+                filtered = filtered.filter(s => {
+                    const p = state.platforms.find(plat => plat.id === s.platformId);
+                    return p && p.type === userPlatformFilter;
+                });
+            }
+
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-slate-500 bg-slate-900/50 rounded-2xl border border-slate-800/80 p-6">
+                        <i class="fa-solid fa-calendar-xmark text-4xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-semibold text-slate-400">Tidak ada jadwal live</p>
+                        <p class="text-xs text-slate-500 mt-1">Belum ada sesi live yang dijadwalkan pada tanggal ini.</p>
+                    </div>`;
+                return;
+            }
+
+            filtered.forEach(s => {
+                const platform = state.platforms.find(p => p.id === s.platformId) || { name: 'Platform Tidak Ditemukan', type: 'other' };
+                const host = state.hosts.find(h => h.id === s.hostId) || { name: 'Belum Ditentukan', wa: '' };
+                const platUI = getPlatformUI(platform.type);
+
+                const card = document.createElement('div');
+                card.className = "bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-md backdrop-blur-sm hover:border-slate-600 transition-all space-y-3";
+                
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold border ${platUI.bg} ${platUI.color} flex items-center gap-1.5">
+                                <i class="fa-solid ${platUI.icon}"></i> ${platform.name}
+                            </span>
+                        </div>
+                        <span class="text-xs font-bold text-slate-300 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700/50">
+                            <i class="fa-regular fa-clock mr-1 text-indigo-400"></i>${s.time}
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-sm shadow-md">
+                                ${host.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-semibold">Host Bertugas</p>
+                                <h4 class="text-sm font-bold text-white">${host.name}</h4>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            ${host.wa ? `
+                            <a href="https://wa.me/${formatWaNumber(host.wa)}" target="_blank" class="w-9 h-9 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center text-sm shadow-sm" title="Hubungi WA">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>` : ''}
+                            <button onclick="openSwapModal('${s.id}')" class="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center text-sm shadow-sm" title="Tukar Shift">
+                                <i class="fa-solid fa-right-left"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openAdminLogin() {
+            if(isAdmin) {
+                switchView('admin');
+            } else {
+                openModal('login-modal');
+            }
+        }
+
+        function verifyAdminLogin() {
+            const pin = document.getElementById('admin-pin-input').value;
+            if(pin === '138080') {
+                isAdmin = true;
+                closeModal('login-modal');
+                switchView('admin');
+                showToast("Berhasil masuk mode admin", "success");
+            } else {
+                showToast("PIN Admin Salah!", "error");
+            }
+        }
+
+        function switchView(view) {
+            if(view === 'admin') {
+                document.getElementById('view-user').classList.add('hidden');
+                document.getElementById('view-admin').classList.remove('hidden');
+                renderAdminList();
+            } else {
+                document.getElementById('view-admin').classList.add('hidden');
+                document.getElementById('view-user').classList.remove('hidden');
+                renderSchedules();
+            }
+        }
+
+        function exitAdmin() {
+            switchView('user');
+        }
+
+        function switchAdminTab(tab) {
+            currentAdminTab = tab;
+            ['schedules', 'hosts', 'platforms', 'history'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if (btn) {
+                    if(t === tab) {
+                        btn.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white transition-all";
+                    } else {
+                        btn.className = "flex-1 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-slate-200 transition-all";
+                    }
+                }
+            });
+
+            const tools = document.getElementById('admin-schedule-tools');
+            const btnAdd = document.getElementById('btn-admin-add');
+
+            if (tab === 'schedules') {
+                tools.classList.remove('hidden');
+                btnAdd.classList.remove('hidden');
+            } else if (tab === 'history') {
+                tools.classList.add('hidden');
+                btnAdd.classList.add('hidden');
+            } else {
+                tools.classList.add('hidden');
+                btnAdd.classList.remove('hidden');
+            }
+
+            renderAdminList();
+        }
+
+        function renderAdminList() {
+            const container = document.getElementById('admin-list-container');
+            if(!container) return;
+            container.innerHTML = '';
+
+            if (currentAdminTab === 'schedules') {
+                const date = document.getElementById('admin-filter-date').value || getToday();
+                let filtered = (state.schedules || []).filter(s => s.date === date);
+
+                if (adminPlatformFilter !== 'all') {
+                    filtered = filtered.filter(s => {
+                        const p = state.platforms.find(plat => plat.id === s.platformId);
+                        return p && p.type === adminPlatformFilter;
+                    });
+                }
+
+                if (filtered.length === 0) {
+                    container.innerHTML = `<p class="text-center text-slate-500 py-8 text-xs">Tidak ada data jadwal pada tanggal ini.</p>`;
+                    return;
+                }
+
+                filtered.forEach(s => {
+                    const platform = state.platforms.find(p => p.id === s.platformId) || { name: 'Unassigned', type: 'other' };
+                    const host = state.hosts.find(h => h.id === s.hostId) || { name: 'Unassigned' };
+                    const platUI = getPlatformUI(platform.type);
+
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-800 p-3.5 rounded-xl border border-slate-700/80 flex justify-between items-center";
+                    div.innerHTML = `
+                        <div class="space-y-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${platUI.bg} ${platUI.color}">
+                                ${platform.name}
+                            </span>
+                            <p class="text-xs font-bold text-white mt-1">${s.time}</p>
+                            <p class="text-xs text-indigo-300">Host: ${host.name}</p>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <button onclick="openFormModal('schedules', '${s.id}')" class="p-2 text-slate-400 hover:text-indigo-400 text-xs"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteItem('schedules', '${s.id}')" class="p-2 text-slate-400 hover:text-red-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } else if (currentAdminTab === 'hosts') {
+                if (!state.hosts || state.hosts.length === 0) {
+                    container.innerHTML = `<p class="text-center text-slate-500 py-8 text-xs">Belum ada host terdaftar.</p>`;
+                    return;
+                }
+                state.hosts.forEach(h => {
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-800 p-3.5 rounded-xl border border-slate-700/80 flex justify-between items-center";
+                    div.innerHTML = `
+                        <div>
+                            <h4 class="text-sm font-bold text-white">${h.name}</h4>
+                            <p class="text-xs text-slate-400"><i class="fa-brands fa-whatsapp text-emerald-400 mr-1"></i>${h.wa || '-'}</p>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <button onclick="openFormModal('hosts', '${h.id}')" class="p-2 text-slate-400 hover:text-indigo-400 text-xs"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteItem('hosts', '${h.id}')" class="p-2 text-slate-400 hover:text-red-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } else if (currentAdminTab === 'platforms') {
+                if (!state.platforms || state.platforms.length === 0) {
+                    container.innerHTML = `<p class="text-center text-slate-500 py-8 text-xs">Belum ada platform terdaftar.</p>`;
+                    return;
+                }
+                state.platforms.forEach(p => {
+                    const platUI = getPlatformUI(p.type);
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-800 p-3.5 rounded-xl border border-slate-700/80 flex justify-between items-center";
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid ${platUI.icon} ${platUI.color}"></i>
+                            <div>
+                                <h4 class="text-sm font-bold text-white">${p.name}</h4>
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider">${p.type}</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <button onclick="openFormModal('platforms', '${p.id}')" class="p-2 text-slate-400 hover:text-indigo-400 text-xs"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteItem('platforms', '${p.id}')" class="p-2 text-slate-400 hover:text-red-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } else if (currentAdminTab === 'history') {
+                if (!state.swapHistory || state.swapHistory.length === 0) {
+                    container.innerHTML = `<p class="text-center text-slate-500 py-8 text-xs">Belum ada riwayat penukaran shift.</p>`;
+                    return;
+                }
+                state.swapHistory.slice().reverse().forEach(sh => {
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/50 space-y-1 text-xs";
+                    div.innerHTML = `
+                        <div class="flex justify-between text-slate-400 text-[10px]">
+                            <span><i class="fa-regular fa-clock mr-1"></i>${sh.timestamp || '-'}</span>
+                            <span class="text-emerald-400 font-bold">SUKSES</span>
+                        </div>
+                        <p class="text-white font-semibold">${sh.host1Name} <i class="fa-solid fa-arrow-right-arrow-left text-indigo-400 mx-1"></i> ${sh.host2Name}</p>
+                        <p class="text-slate-400 text-[11px]">${sh.schedule1Desc} &bull; ${sh.schedule2Desc}</p>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        function openFormModal(type = currentAdminTab, id = null) {
+            document.getElementById('form-schedules').classList.add('hidden');
+            document.getElementById('form-hosts').classList.add('hidden');
+            document.getElementById('form-platforms').classList.add('hidden');
+
+            const title = document.getElementById('form-modal-title');
+
+            if (type === 'schedules') {
+                title.innerText = id ? 'Edit Jadwal' : 'Tambah Jadwal';
+                document.getElementById('form-schedules').classList.remove('hidden');
+
+                // Populate selects
+                const pSelect = document.getElementById('sched-platform');
+                pSelect.innerHTML = (state.platforms || []).map(p => `<option value="${p.id}">${p.name} (${p.type})</option>`).join('');
+
+                const hSelect = document.getElementById('sched-host');
+                hSelect.innerHTML = (state.hosts || []).map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+
+                if (id) {
+                    const item = state.schedules.find(s => s.id === id);
+                    if (item) {
+                        document.getElementById('sched-id').value = item.id;
+                        document.getElementById('sched-date').value = item.date;
+                        document.getElementById('sched-time').value = item.time;
+                        document.getElementById('sched-platform').value = item.platformId;
+                        document.getElementById('sched-host').value = item.hostId;
+                    }
+                } else {
+                    document.getElementById('sched-id').value = '';
+                    document.getElementById('sched-date').value = document.getElementById('admin-filter-date').value || getToday();
+                    document.getElementById('sched-time').value = '';
+                }
+            } else if (type === 'hosts') {
+                title.innerText = id ? 'Edit Host' : 'Tambah Host';
+                document.getElementById('form-hosts').classList.remove('hidden');
+
+                if (id) {
+                    const item = state.hosts.find(h => h.id === id);
+                    if (item) {
+                        document.getElementById('host-id').value = item.id;
+                        document.getElementById('host-name').value = item.name;
+                        document.getElementById('host-wa').value = item.wa;
+                        document.getElementById('host-pin').value = item.pin;
+                    }
+                } else {
+                    document.getElementById('host-id').value = '';
+                }
+            } else if (type === 'platforms') {
+                title.innerText = id ? 'Edit Akun Platform' : 'Tambah Akun Platform';
+                document.getElementById('form-platforms').classList.remove('hidden');
+
+                if (id) {
+                    const item = state.platforms.find(p => p.id === id);
+                    if (item) {
+                        document.getElementById('plat-id').value = item.id;
+                        document.getElementById('plat-name').value = item.name;
+                        const radios = document.getElementsByName('plat-type');
+                        for(let r of radios) { if(r.value === item.type) r.checked = true; }
+                    }
+                } else {
+                    document.getElementById('plat-id').value = '';
+                }
+            }
+
+            openModal('form-modal');
+        }
+
+        function saveFormData() {
+            if (currentAdminTab === 'schedules') {
+                const id = document.getElementById('sched-id').value;
+                const date = document.getElementById('sched-date').value;
+                const time = document.getElementById('sched-time').value.trim();
+                const platformId = document.getElementById('sched-platform').value;
+                const hostId = document.getElementById('sched-host').value;
+
+                if(!date || !time || !platformId || !hostId) {
+                    showToast("Harap isi semua bidang input!", "error");
+                    return;
+                }
+
+                if (id) {
+                    const idx = state.schedules.findIndex(s => s.id === id);
+                    if(idx !== -1) state.schedules[idx] = { id, date, time, platformId, hostId };
+                } else {
+                    state.schedules.push({ id: generateId(), date, time, platformId, hostId });
+                }
+            } else if (currentAdminTab === 'hosts') {
+                const id = document.getElementById('host-id').value;
+                const name = document.getElementById('host-name').value.trim();
+                const wa = document.getElementById('host-wa').value.trim();
+                const pin = document.getElementById('host-pin').value.trim();
+
+                if(!name || !pin) {
+                    showToast("Nama dan PIN Host wajib diisi!", "error");
+                    return;
+                }
+
+                if (id) {
+                    const idx = state.hosts.findIndex(h => h.id === id);
+                    if(idx !== -1) state.hosts[idx] = { id, name, wa, pin };
+                } else {
+                    state.hosts.push({ id: generateId(), name, wa, pin });
+                }
+            } else if (currentAdminTab === 'platforms') {
+                const id = document.getElementById('plat-id').value;
+                const name = document.getElementById('plat-name').value.trim();
+                let type = 'shopee';
+                const radios = document.getElementsByName('plat-type');
+                for(let r of radios) { if(r.checked) type = r.value; }
+
+                if(!name) {
+                    showToast("Nama platform wajib diisi!", "error");
+                    return;
+                }
+
+                if (id) {
+                    const idx = state.platforms.findIndex(p => p.id === id);
+                    if(idx !== -1) state.platforms[idx] = { id, name, type };
+                } else {
+                    state.platforms.push({ id: generateId(), name, type });
+                }
+            }
+
+            closeModal('form-modal');
+            syncDataToCloud();
+            renderAdminList();
+            renderSchedules();
+            showToast("Data berhasil disimpan", "success");
+        }
+
+        function deleteItem(type, id) {
+            showConfirm("Hapus Data", "Apakah Anda yakin ingin menghapus data ini?", () => {
+                if (type === 'schedules') state.schedules = state.schedules.filter(s => s.id !== id);
+                if (type === 'hosts') state.hosts = state.hosts.filter(h => h.id !== id);
+                if (type === 'platforms') state.platforms = state.platforms.filter(p => p.id !== id);
+
+                syncDataToCloud();
+                renderAdminList();
+                renderSchedules();
+                showToast("Data telah dihapus", "success");
+            });
+        }
+
+        function openCopyScheduleModal() {
+            const date = document.getElementById('admin-filter-date').value || getToday();
+            const schedulesToday = (state.schedules || []).filter(s => s.date === date);
+
+            if (schedulesToday.length === 0) {
+                showToast("Tidak ada jadwal pada tanggal ini untuk disalin!", "error");
+                return;
+            }
+
+            document.getElementById('copy-source-info').innerText = `Menyalin ${schedulesToday.length} sesi dari ${date}`;
+            const container = document.getElementById('copy-target-days-container');
+            container.innerHTML = '';
+
+            const baseDate = new Date(date);
+            for (let i = 1; i <= 7; i++) {
+                const target = new Date(baseDate);
+                target.setDate(target.getDate() + i);
+
+                const yyyy = target.getFullYear();
+                const mm = String(target.getMonth() + 1).padStart(2, '0');
+                const dd = String(target.getDate()).padStart(2, '0');
+                const dateStr = `${yyyy}-${mm}-${dd}`;
+
+                const dayLabel = target.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' });
+
+                const label = document.createElement('label');
+                label.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-700/80 cursor-pointer hover:border-indigo-500/50 transition-colors";
+                label.innerHTML = `
+                    <span class="text-xs font-semibold text-slate-200">${dayLabel} (${dateStr})</span>
+                    <input type="checkbox" name="copy-target-date" value="${dateStr}" class="rounded bg-slate-800 border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                `;
+                container.appendChild(label);
+            }
+
+            openModal('copy-schedule-modal');
+        }
+
+        function executeCopySchedule() {
+            const sourceDate = document.getElementById('admin-filter-date').value || getToday();
+            const sourceSchedules = (state.schedules || []).filter(s => s.date === sourceDate);
+
+            const checkboxes = document.getElementsByName('copy-target-date');
+            const targetDates = [];
+            checkboxes.forEach(cb => { if(cb.checked) targetDates.push(cb.value); });
+
+            if (targetDates.length === 0) {
+                showToast("Pilih minimal satu tanggal tujuan!", "error");
+                return;
+            }
+
+            const overwrite = document.getElementById('copy-overwrite').checked;
+
+            targetDates.forEach(tDate => {
+                if (overwrite) {
+                    state.schedules = state.schedules.filter(s => s.date !== tDate);
+                }
+                sourceSchedules.forEach(s => {
+                    state.schedules.push({
+                        id: generateId(),
+                        date: tDate,
+                        time: s.time,
+                        platformId: s.platformId,
+                        hostId: s.hostId
+                    });
+                });
+            });
+
+            closeModal('copy-schedule-modal');
+            syncDataToCloud();
+            renderAdminList();
+            renderSchedules();
+            showToast(`Berhasil menyalin ke ${targetDates.length} hari!`, "success");
+        }
+
+        function openSwapModal(schedId) {
+            currentSwapScheduleId = schedId;
+            const sched1 = state.schedules.find(s => s.id === schedId);
+            if (!sched1) return;
+
+            const host1 = state.hosts.find(h => h.id === sched1.hostId) || { name: 'Host' };
+            const plat1 = state.platforms.find(p => p.id === sched1.platformId) || { name: 'Platform' };
+
+            document.getElementById('swap-source-info').innerText = `${host1.name} (${plat1.name} - ${sched1.time})`;
+            document.getElementById('lbl-pin-1').innerText = `PIN ${host1.name} (Pengaju)`;
+
+            const selectTarget = document.getElementById('swap-target');
+            selectTarget.innerHTML = '';
+
+            const availableTargets = state.schedules.filter(s => s.id !== schedId);
+
+            if (availableTargets.length === 0) {
+                showToast("Tidak ada jadwal lain yang tersedia untuk ditukar!", "error");
+                return;
+            }
+
+            availableTargets.forEach(s => {
+                const h = state.hosts.find(host => host.id === s.hostId) || { name: 'Host' };
+                const p = state.platforms.find(plat => plat.id === s.platformId) || { name: 'Platform' };
+                const option = document.createElement('option');
+                option.value = s.id;
+                option.innerText = `${s.date} | ${h.name} - ${p.name} (${s.time})`;
+                selectTarget.appendChild(option);
+            });
+
+            updateTargetHostLabel();
+            selectTarget.onchange = updateTargetHostLabel;
+
+            openModal('swap-modal');
+        }
+
+        function updateTargetHostLabel() {
+            const targetId = document.getElementById('swap-target').value;
+            const sched2 = state.schedules.find(s => s.id === targetId);
+            if (sched2) {
+                const host2 = state.hosts.find(h => h.id === sched2.hostId) || { name: 'Host' };
+                document.getElementById('lbl-pin-2').innerText = `PIN ${host2.name} (Pengganti)`;
+            }
+        }
+
+        function executeSwap() {
+            const sched1 = state.schedules.find(s => s.id === currentSwapScheduleId);
+            const targetId = document.getElementById('swap-target').value;
+            const sched2 = state.schedules.find(s => s.id === targetId);
+
+            if (!sched1 || !sched2) {
+                showToast("Jadwal tidak ditemukan!", "error");
+                return;
+            }
+
+            const host1 = state.hosts.find(h => h.id === sched1.hostId);
+            const host2 = state.hosts.find(h => h.id === sched2.hostId);
+
+            const pin1 = document.getElementById('swap-pin-1').value.trim();
+            const pin2 = document.getElementById('swap-pin-2').value.trim();
+
+            if (!pin1 || !pin2) {
+                showToast("Harap masukkan PIN kedua host!", "error");
+                return;
+            }
+
+            if (host1 && host1.pin !== pin1) {
+                showToast(`PIN Host Pengaju (${host1.name}) Salah!`, "error");
+                return;
+            }
+
+            if (host2 && host2.pin !== pin2) {
+                showToast(`PIN Host Pengganti (${host2.name}) Salah!`, "error");
+                return;
+            }
+
+            // Perform swap of host IDs
+            const tempHostId = sched1.hostId;
+            sched1.hostId = sched2.hostId;
+            sched2.hostId = tempHostId;
+
+            // Record swap history
+            const p1 = state.platforms.find(p => p.id === sched1.platformId) || { name: 'Platform' };
+            const p2 = state.platforms.find(p => p.id === sched2.platformId) || { name: 'Platform' };
+
+            const historyEntry = {
+                id: generateId(),
+                timestamp: new Date().toLocaleString('id-ID'),
+                host1Name: host1 ? host1.name : 'Host 1',
+                host2Name: host2 ? host2.name : 'Host 2',
+                schedule1Desc: `${sched1.date} ${p1.name} (${sched1.time})`,
+                schedule2Desc: `${sched2.date} ${p2.name} (${sched2.time})`
+            };
+
+            if (!state.swapHistory) state.swapHistory = [];
+            state.swapHistory.push(historyEntry);
+
+            closeModal('swap-modal');
+            syncDataToCloud();
+            renderSchedules();
+            if(isAdmin) renderAdminList();
+            showToast("Tukar shift berhasil dikonfirmasi!", "success");
+        }
+
+        window.onload = function() {
+            initApp();
+        };
+
+        async function initApp() {
+            document.getElementById('filter-date').value = getToday();
+            document.getElementById('admin-filter-date').value = getToday();
+            await fetchCloudData();
+        }
+    </script>
+</body>
+</html>
